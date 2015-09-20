@@ -679,6 +679,30 @@ bool cmp_ticks (const struct list_elem *a,
   return false;
 }
 
+/********************************************************************/
+void donate_priority (void)
+{
+  int depth = 0;
+  struct thread *t = thread_current();
+  struct lock *l = t->wait_on_lock;
+  while (l && depth < DEPTH_LIMIT)
+    {
+      depth++;
+      // If lock is not being held, return
+      if (!l->holder)
+	{
+	  return;
+	}
+      if (l->holder->priority >= t->priority)
+	{
+	  return;
+	}
+      l->holder->priority = t->priority;
+      t = l->holder;
+      l = t->wait_on_lock;
+    }
+}
+
 void remove_with_lock(struct lock *lock)
 {
   struct list_elem *e = list_begin(&thread_current()->donations);
@@ -693,25 +717,6 @@ void remove_with_lock(struct lock *lock)
 	}
       e = next;
     }
-}
-
-void donate_priority (void)
-{
-  struct thread *t = thread_current();
-  struct lock *l = t->wait_on_lock;
-  while(l) {
-    // If lock is not being held, return
-    if ( ! l->holder) {
-      return;
-    }
-    // If the lock’s holder has a higher priority, return
-    if (l->holder->priority >= t->priority) {
-      return;
-    }
-    l->holder->priority = t->priority;
-    t = l->holder;
-    l = t->wait_on_lock;
-  }
 }
 
 /* Offset of `stack' member within `struct thread'.
