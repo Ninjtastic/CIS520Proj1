@@ -15,6 +15,11 @@
 #include "userprog/process.h"
 #endif
 
+#define LOAD_AVG_DEFAULT 0;
+#define NICE_DEFAULT 0;
+
+#define DEPTH_LIMIT 8
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -109,7 +114,6 @@ thread_start (void)
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
   thread_create ("idle", PRI_MIN, idle, &idle_started);
-
   /* Start preemptive thread scheduling. */
   intr_enable ();
 
@@ -208,6 +212,9 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+  old_level = intr_disable();
+  test_max_priority();
+  intr_set_level (old_level);
 
   return tid;
 }
@@ -245,7 +252,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem,(list_less_func*) &cmp_priority,NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -316,7 +323,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list, &cur->elem,(list_less_func *) &cmp_priority,NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -343,16 +350,39 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  enum intr_level old_level = intr_disable ();
+  int old_priority = thread_current()->priority;
+  thread_current ()->init_priority = new_priority;
+  refresh_priority();
+  // If new priority is greater, donate it
+  if (old_priority < thread_current()->priority)
+    {
+      donate_priority();
+    }
+  // If new priority is less, test if the processor should be yielded
+  if (old_priority > thread_current()->priority)
+    {
+      test_max_priority();
+    }
+  intr_set_level (old_level);
 }
-
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->priority;
+	enum intr_level old_level = intr_disable();
+	int temporary = thread_current()->priority;
+	intr_set_level(old_level);
+	return temporary;
 }
 
+
+/* Returns the current thread's nice value. */
+int
+thread_get_nice (void) 
+{
+	return 0;
+}
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice UNUSED) 
@@ -360,20 +390,11 @@ thread_set_nice (int nice UNUSED)
   /* Not yet implemented. */
 }
 
-/* Returns the current thread's nice value. */
-int
-thread_get_nice (void) 
-{
-  /* Not yet implemented. */
-  return 0;
-}
-
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+	return 0;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -479,6 +500,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
+  // Added initializations for priority donation
+  t->init_priority = priority;
+  t->wait_on_lock = NULL;
+  list_init(&t->donations);
+
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -589,6 +615,108 @@ allocate_tid (void)
   lock_release (&tid_lock);
 
   return tid;
+}
+
+bool cmp_priority (const struct list_elem *a, const struct list_elem *b,
+		   void *aux UNUSED)
+{
+  struct thread *ta = list_entry(a, struct thread, elem);
+  struct thread *tb = list_entry(b, struct thread, elem);
+  if (ta->priority > tb->priority)
+    {
+      return true;
+    }
+  return false;
+}
+
+void refresh_priority (void)
+{
+  struct thread *t = thread_current();
+  t->priority = t->init_priority;
+  if (list_empty(&t->donations))
+    {
+      return;
+    }
+  struct thread *s = list_entry(list_front(&t->donations), struct thread, donation_elem);
+  if (s->priority > t->priority)
+    {
+      t->priority = s->priority;
+    }
+}
+void test_max_priority (void)
+{
+  if ( list_empty(&ready_list) )
+    {
+      return;
+    }
+  struct thread *t = list_entry(list_front(&ready_list), struct thread, elem);
+  if (intr_context())
+    {
+      thread_ticks++;
+      if ( thread_current()->priority < t->priority || (thread_ticks >= TIME_SLICE &&
+	    thread_current()->priority == t->priority) )
+	{
+	  intr_yield_on_return();
+	}
+      return;
+    }
+  if (thread_current()->priority < t->priority)
+    {
+      thread_yield();
+    }
+}
+
+bool cmp_ticks (const struct list_elem *a,
+		const struct list_elem *b,
+		void *aux UNUSED)
+{
+  struct thread *ta = list_entry(a, struct thread, elem);
+  struct thread *tb = list_entry(b, struct thread, elem);
+  if (ta->ticks < tb->ticks)
+    {
+      return true;
+    }
+  return false;
+}
+
+/********************************************************************/
+void donate_priority (void)
+{
+  int depth = 0;
+  struct thread *t = thread_current();
+  struct lock *l = t->wait_on_lock;
+  while (l && depth < DEPTH_LIMIT)
+    {
+      depth++;
+      // If lock is not being held, return
+      if (!l->holder)
+	{
+	  return;
+	}
+      if (l->holder->priority >= t->priority)
+	{
+	  return;
+	}
+      l->holder->priority = t->priority;
+      t = l->holder;
+      l = t->wait_on_lock;
+    }
+}
+
+void remove_with_lock(struct lock *lock)
+{
+  struct list_elem *e = list_begin(&thread_current()->donations);
+  struct list_elem *next;
+  while (e != list_end(&thread_current()->donations))
+    {
+      struct thread *t = list_entry(e, struct thread, donation_elem);
+      next = list_next(e);
+      if (t->wait_on_lock == lock)
+	{
+	  list_remove(e);
+	}
+      e = next;
+    }
 }
 
 /* Offset of `stack' member within `struct thread'.

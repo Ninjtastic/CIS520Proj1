@@ -677,6 +677,20 @@ bool cmp_ticks (const struct list_elem *a,
   return false;
 }
 
+void remove_with_lock(struct lock *lock)
+{
+  struct list_elem *e = list_begin(&thread_current()->donations);
+  struct list_elem *next;
+  while (e != list_end(&thread_current()->donations))
+    {
+      struct thread *t = list_entry(e, struct thread, donation_elem);
+      next = list_next(e);
+      if (t->wait_on_lock == lock)
+	{
+	  list_remove(e);
+	}
+      e = next;
+    }
 
 void donate_priority (void)
 {
