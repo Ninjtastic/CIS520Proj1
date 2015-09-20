@@ -18,8 +18,11 @@
 #define LOAD_AVG_DEFAULT 0;
 #define NICE_DEFAULT 0;
 
+<<<<<<< HEAD
 #define DEPTH_LIMIT 8
 
+=======
+>>>>>>> origin/master
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -679,6 +682,7 @@ bool cmp_ticks (const struct list_elem *a,
   return false;
 }
 
+<<<<<<< HEAD
 /********************************************************************/
 void donate_priority (void)
 {
@@ -717,6 +721,11 @@ void remove_with_lock(struct lock *lock)
 	}
       e = next;
     }
+=======
+
+void donate_priority (void)
+{
+>>>>>>> origin/master
 }
 
 /* Offset of `stack' member within `struct thread'.
