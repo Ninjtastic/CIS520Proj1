@@ -99,13 +99,6 @@ struct thread
     struct list donations;
     struct list_elem donation_elem;
 
-<<<<<<< HEAD
-=======
-    /* Used for FreeBSD scheduling */
-    int nice;
-    int recent_cpu;
-	
->>>>>>> origin/master
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -162,12 +155,9 @@ bool cmp_priority (const struct list_elem *a,
 		   void *aux UNUSED);
 void test_max_priority (void);
 void refresh_priority (void);
-<<<<<<< HEAD
 void donate_priority (void);
 void remove_with_lock (struct lock *lock);
 
-=======
->>>>>>> origin/master
 bool compare_ticks(const struct list_elem *,
                               const struct list_elem *,
                               void *);

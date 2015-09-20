@@ -18,6 +18,8 @@
 #define LOAD_AVG_DEFAULT 0;
 #define NICE_DEFAULT 0;
 
+#define DEPTH_LIMIT 8
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -691,6 +693,7 @@ void remove_with_lock(struct lock *lock)
 	}
       e = next;
     }
+}
 
 void donate_priority (void)
 {
