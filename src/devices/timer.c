@@ -192,7 +192,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   struct list_elem *point_elem;
   struct thread *point_thread;
-  bool preemption = false;
+  bool empty = false;
 
   ticks++;
   thread_tick ();
@@ -203,12 +203,14 @@ timer_interrupt (struct intr_frame *args UNUSED)
       point_elem = list_front (&listOfSleep);
       point_thread = list_entry (point_elem, struct thread, elem);
       if (point_thread -> wakeup_ticks > ticks)
-		break;      
+      {
+          break;
+      }
       list_remove (point_elem);
       thread_unblock (point_thread);
-      preemption = true;
+      empty = true;
   }
-  if (preemption)
+  if (empty)
     intr_yield_on_return();
 }
 
