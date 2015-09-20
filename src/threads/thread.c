@@ -16,7 +16,6 @@
 #endif
 
 #define LOAD_AVG_DEFAULT 0;
-
 #define NICE_DEFAULT 0;
 
 /* Random value for struct thread's `magic' member.
@@ -63,7 +62,6 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
-int load_avg;
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -114,7 +112,6 @@ thread_start (void)
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
   thread_create ("idle", PRI_MIN, idle, &idle_started);
- load_avg = LOAD_AVG_DEFAULT;
   /* Start preemptive thread scheduling. */
   intr_enable ();
 
@@ -351,10 +348,6 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  if (thread_mlfqs)
-    {
-      return;
-    }
   enum intr_level old_level = intr_disable ();
   int old_priority = thread_current()->priority;
   thread_current ()->init_priority = new_priority;
@@ -381,24 +374,18 @@ thread_get_priority (void)
 	return temporary;
 }
 
-/* Sets the current thread's nice value to NICE. */
-void
-thread_set_nice (int nice UNUSED) 
-{
-  enum intr_level old_level = intr_disable ();
-  thread_current()->nice = nice;
-  test_max_priority();
-  intr_set_level (old_level);
-}
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  enum intr_level old_level = intr_disable ();
-  int tmp = thread_current()->nice;
-  intr_set_level (old_level);
-  return tmp;
+	return 0;
+}
+/* Sets the current thread's nice value to NICE. */
+void
+thread_set_nice (int nice UNUSED) 
+{
+  /* Not yet implemented. */
 }
 
 /* Returns 100 times the system load average. */
@@ -516,8 +503,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->wait_on_lock = NULL;
   list_init(&t->donations);
 
-  // Added for BSD scheduler
-  t->nice = NICE_DEFAULT;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -695,23 +680,6 @@ bool cmp_ticks (const struct list_elem *a,
 
 void donate_priority (void)
 {
-  struct thread *t = thread_current();
-  struct lock *l = t->wait_on_lock;
-  while (l)
-    {
-      // If lock is not being held, return
-      if (!l->holder)
-	{
-	  return;
-	}
-      if (l->holder->priority >= t->priority)
-	{
-	  return;
-	}
-      l->holder->priority = t->priority;
-      t = l->holder;
-      l = t->wait_on_lock;
-    }
 }
 
 /* Offset of `stack' member within `struct thread'.
