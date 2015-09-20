@@ -90,8 +90,15 @@ struct thread
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
 	
-	int64_t wakeup_ticks;               /* Wakeup ticks used by timer sleep */
-	
+    int64_t wakeup_ticks;               //The ticks to wake up by timer_sleep
+    int64_t ticks;			/* Used for timer sleep */
+
+    /* Used for priority scheduling */
+    int init_priority;
+    struct lock *wait_on_lock;
+    struct list donations;
+    struct list_elem donation_elem;
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -134,11 +141,22 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
-
+void donate_priority (void);
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+/* Added functions */
+bool cmp_ticks (const struct list_elem *a,
+		const struct list_elem *b,
+		void *aux UNUSED);
+bool cmp_priority (const struct list_elem *a,
+		   const struct list_elem *b,
+		   void *aux UNUSED);
+void test_max_priority (void);
+void refresh_priority (void);
+void donate_priority (void);
+void remove_with_lock (struct lock *lock);
 
 bool compare_ticks(const struct list_elem *,
                               const struct list_elem *,

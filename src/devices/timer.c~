@@ -108,10 +108,11 @@ timer_sleep (int64_t ticks)
   current_thread = thread_current ();
   current_thread->wakeup_ticks = timer_ticks () + ticks;
 
-  //Insert the current_threads to the list of waiting(put thread to sleep). Using fuction in kernel/list.c
+  //Insert the current_threads to the list of waiting(put thread to sleep). 
+  //Using fuction in kernel/list.c
   list_insert_ordered  (&listOfSleep, 
 			&current_thread->elem,
-                       	compare_ticks, NULL);
+                       	compare_priority, NULL);
   
   //Block the thread that we put to wait
   thread_block ();
@@ -192,7 +193,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   struct list_elem *point_elem;
   struct thread *point_thread;
-  bool empty = false;
+  bool preemption = false;
 
   ticks++;
   thread_tick ();
@@ -203,14 +204,12 @@ timer_interrupt (struct intr_frame *args UNUSED)
       point_elem = list_front (&listOfSleep);
       point_thread = list_entry (point_elem, struct thread, elem);
       if (point_thread -> wakeup_ticks > ticks)
-      {
-          break;
-      }
+		break;      
       list_remove (point_elem);
       thread_unblock (point_thread);
-      empty = true;
+      preemption = true;
   }
-  if (empty)
+  if (preemption)
     intr_yield_on_return();
 }
 
