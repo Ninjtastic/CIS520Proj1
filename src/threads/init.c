@@ -120,6 +120,9 @@ main (void)
   serial_init_queue ();
   timer_calibrate ();
 
+  /* Start Wake Up Call service thread */
+  timer_start_wake_up_service ();
+
 #ifdef FILESYS
   /* Initialize file system. */
   ide_init ();
@@ -130,9 +133,10 @@ main (void)
   printf ("Boot complete.\n");
   
   /* Run actions specified on kernel command line. */
-  run_actions (argv);
+  run_actions (argv);  
 
   /* Finish up. */
+  timer_stop_wake_up_service ();
   shutdown ();
   thread_exit ();
 }
@@ -285,7 +289,7 @@ run_task (char **argv)
   
   printf ("Executing '%s':\n", task);
 #ifdef USERPROG
-  process_wait (process_execute (task));
+  process_wait (process_execute (task, false));
 #else
   run_test (task);
 #endif

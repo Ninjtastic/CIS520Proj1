@@ -4,6 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
+
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -89,18 +91,35 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
-	
-    int64_t wakeup_ticks;               //The ticks to wake up by timer_sleep
-    int64_t ticks;			/* Used for timer sleep */
-
-    /* Used for priority scheduling */
-    int init_priority;
-    struct lock *wait_on_lock;
-    struct list donations;
-    struct list_elem donation_elem;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    
+    /* Used for donators list */
+    struct list_elem donation_elem;
+    
+    /* List of threads donating their priority to this thread */
+    struct list donators;
+    
+    /* Thread that currently owns this priority */
+    struct thread* donation_recipient;
+    
+    /* For quick check if this thread has been donated to */
+    bool is_donee;
+    
+    /* Exit code of the thread set by process_exit */
+    int exit_code;
+    
+    /* Semaphore that can be used to wait for exit of this thread*/
+    struct semaphore exit_semaphore;    
+    /* Semaphore that can be used to block exit until exit code was read */
+    struct semaphore exit_code_semaphore;
+    /* List of child processes / threads */
+    struct list child_threads;
+    /* List element for child_threads list */
+    struct list_elem child_elem;
+    /* PID of parent process */
+    int parent_pid;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -139,27 +158,24 @@ void thread_yield (void);
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
 
+int thread_exit_status (int pid);
+
+int thread_priority (struct thread* thread);
 int thread_get_priority (void);
 void thread_set_priority (int);
-void donate_priority (void);
+
+void thread_add_donation (struct thread*);
+void thread_remove_donation (struct thread*);
+
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-/* Added functions */
-bool cmp_ticks (const struct list_elem *a,
-		const struct list_elem *b,
-		void *aux UNUSED);
-bool cmp_priority (const struct list_elem *a,
-		   const struct list_elem *b,
-		   void *aux UNUSED);
-void test_max_priority (void);
-void refresh_priority (void);
-void donate_priority (void);
-void remove_with_lock (struct lock *lock);
 
-bool compare_ticks(const struct list_elem *,
-                              const struct list_elem *,
-                              void *);
+bool thread_valid (struct thread *t);
+
+bool
+thread_priority_sort (const struct list_elem *a, const struct list_elem *b,
+                   void *aux UNUSED);
 
 #endif /* threads/thread.h */
