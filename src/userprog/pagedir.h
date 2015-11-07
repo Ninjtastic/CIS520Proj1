@@ -15,6 +15,4 @@ bool pagedir_is_accessed (uint32_t *pd, const void *upage);
 void pagedir_set_accessed (uint32_t *pd, const void *upage, bool accessed);
 void pagedir_activate (uint32_t *pd);
 
-bool pagedir_valid_uaddr (const void* uaddr, uint32_t* pd);  //declare the validation function
-
 #endif /* userprog/pagedir.h */
